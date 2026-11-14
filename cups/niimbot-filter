@@ -1,5 +1,5 @@
 #!/bin/bash
-# CUPS filter for niimbot-proxy. (bash, not sh: needs `read -t`. /bin/bash ships with every macOS.)
+# CUPS filter for niimbot-proxy. (/bin/bash ships with every macOS.)
 # argv: job-id user title copies options [file]
 # 1. Emits one header line with job options, then passes the PDF through unchanged.
 #    Queue defaults (set in printer settings / lpadmin -o) are read from the PPD;
@@ -24,12 +24,23 @@ exec 1>&-                                   # end of job data: the backend half-
 
 { : <&3; } 2>/dev/null || exit 0            # no back-channel (run by hand): nothing to wait for
 
-# The proxy repeats its last status every 10 s, so 45 s of silence means it is gone.
-while IFS= read -r -t 45 line <&3; do
-  case "$line" in
-    "NIIMBOT-DONE ok"*)   exit 0 ;;
-    "NIIMBOT-DONE fail"*) exit 1 ;;
-    INFO:*|WARNING:*|ERROR:*|STATE:*) echo "$line" >&2 ;;
-  esac
+# cupsd makes fd 3 non-blocking, so `read` fails at once when nothing is waiting, and bash 3.2 can't
+# tell that from end-of-file. So poll: keep partial lines, and give up after 45 s of silence
+# (the proxy repeats its last status every 10 s, so that much silence means it is gone).
+buf="" idle=0
+while [ "$idle" -lt 225 ]; do
+  if IFS= read -r line <&3 2>/dev/null; then
+    line="$buf$line" buf="" idle=0
+    case "$line" in
+      "NIIMBOT-DONE ok"*)   exit 0 ;;
+      "NIIMBOT-DONE fail"*) exit 1 ;;
+      INFO:*|WARNING:*|ERROR:*|STATE:*) echo "$line" >&2 ;;
+    esac
+  else
+    [ -n "$line" ] && idle=0
+    buf="$buf$line"
+    sleep 0.2
+    idle=$((idle + 1))
+  fi
 done
 exit 0

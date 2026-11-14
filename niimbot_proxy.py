@@ -569,8 +569,9 @@ def parse_job_options(text: str) -> dict:
 
 
 class Proxy:
-    def __init__(self, cfg: dict):
+    def __init__(self, cfg: dict, reload=None):
         self.cfg = cfg
+        self.reload = reload                # serve: re-read config.json for every job, so edits need no restart
         self.lock = asyncio.Lock()
 
     async def run_job(self, data: bytes, opts: dict, say=lambda line: None):
@@ -617,6 +618,8 @@ class Proxy:
                 await asyncio.sleep(2)
 
     async def handle(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+        if self.reload:
+            self.cfg = self.reload()
         from_cups = False
         last = ["INFO: Processing"]
 
@@ -828,7 +831,7 @@ def main():
     elif args.cmd == "render":
         render_preview(args.file, args.out, args.dither, black_level(args.black_level))
     elif args.cmd == "serve":
-        asyncio.run(Proxy(load_config(args)).serve(args.port))
+        asyncio.run(Proxy(load_config(args), reload=lambda: load_config(args)).serve(args.port))
     elif args.cmd == "status":
         try:
             asyncio.run(status(load_config(args)))

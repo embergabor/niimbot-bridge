@@ -356,6 +356,7 @@ def through_cups(transport_factory, cfg=None):
     def backend(port):
         sock = socket.create_connection(("127.0.0.1", port))
         r, w = os.pipe()
+        os.set_blocking(r, False)             # cupsd hands filters a non-blocking back-channel (O_NDELAY)
         filt = subprocess.Popen(["bash", "-c", f'exec "$0" "$@" 3<&{r}', str(ROOT / "cups/niimbot-filter"),
                                  "1", "gabor", "t", "1", "", str(pdf)],
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, pass_fds=(r,))

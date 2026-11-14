@@ -56,7 +56,7 @@ Optional, per user: `~/Library/Application Support/NiimbotProxy/config.json`
 - `top_offset_mm`: moves the print down the label by this many millimetres, or up if negative (default 0). The B1 can't print the first ~0.4 mm at a label's top edge, so keep content a millimetre away from the edges
 - `report_failures`: `true` (default) keeps failed jobs in the print queue; `false` marks them done
 
-After editing it: `launchctl kickstart -k gui/$(id -u)/local.niimbot-proxy`
+Changes apply from the next print job; no restart is needed. (To restart the proxy anyway: `pkill -x NiimbotProxy`; it comes back within ten seconds.)
 
 ## Logs and troubleshooting
 
