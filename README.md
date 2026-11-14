@@ -97,3 +97,7 @@ For development, run from source with the build venv: `build/venv/bin/python nii
 - Protocol: the "B1" print task from niimbluelib (MultiMote), documented at printers.niim.blue. It is also compatible with niimprint (AndBondStyle).
 - Single colour only. B1 Pro red/black printing is not implemented.
 - `tests/test_proxy.py` runs the whole path against a simulated printer: filter → socket → daemon → packets → decoded image.
+
+## Licence
+
+MIT, see `LICENSE`.
