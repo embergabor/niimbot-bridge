@@ -64,6 +64,7 @@ Response ids are in the `RESPONSE` dict. 0xDB means a printer error.
 - ✅ The parser resyncs on junk and false `55 55` headers.
 - ✅ Review pass implemented (see `REVIEW.md` status): error handling, wait-for-printer, direct-size PDF rendering, BLE write splitting, trimmed bundle, pinned versions. 11 offline tests, including simulated printer faults.
 - ✅ Roll awareness, status reporting to the print queue, and the two-arch installer pipeline are implemented. 15 offline tests, including a simulated CUPS back-channel. Public repo: github.com/embergabor/niimbot-bridge (branch `main`; commits use the GitHub no-reply address, set in the repo's local git config). No LICENSE file yet.
+- ✅ The GitHub workflow ran green on the first push (2026-11-14): `macos-15` and `macos-15-intel` runners, Python 3.15 and the pinned wheels all work. Its `installer` artifact is a 28 MB unsigned pkg holding both the arm64 and the x86_64 app. Releases on `v*` tags and signing are still untried.
 - ✅ `dist/NiimbotBridge-0.1.0-x86_64.pkg` builds (13 MB; the app is 29 MB). The frozen app passed its smoke tests: `version` loads every library, `render` works, and `serve` plus the real filter carries a job through to the transport ("No Niimbot USB serial port found", with the socket closed cleanly).
 - ❌ **The pkg has never been installed, and nothing has run on real hardware.** This is the next job.
 
@@ -83,7 +84,7 @@ Response ids are in the `RESPONSE` dict. 0xDB means a printer error.
    - **Cancel on failure**: `_abort` sends `0xDA` then PrintEnd. Trigger it by opening the lid mid-print and check the log and the next job.
 4. Print from Preview through CUPS. Watch the queue window: it should show progress, and a job sent with the printer off should wait, fail with a reason and stay in the queue. Check `/var/log/cups/error_log` if the job hangs for ~45 s after printing (back-channel not reaching the filter). Verify that page sizes show in the dialog with readable names, that `-o media=Custom.40x30mm` works, that options arrive (including BlackLevel) (see `INFO: niimbot-filter …` in `/var/log/cups/error_log` or the job log), and that copies aren't doubled. If copies are doubled, flip `cupsManualCopies`.
 5. BLE: check that the TCC prompt appears for NiimbotProxy.app. `scan` run from a terminal attributes Bluetooth to the terminal app, not to NiimbotProxy, so test BLE through the LaunchAgent and CUPS path. If no prompt appears, try launchd running `Contents/MacOS/NiimbotProxy` directly.
-6. GitHub: check the workflow runs (`gh run list`): runner labels `macos-15` / `macos-15-intel`, Python 3.15 from setup-python, and the pinned wheels existing for both CPU types are all unverified. Signing and notarization need the user's Apple Developer ID and the secrets listed in the workflow; hardened-runtime entitlements are a best guess until a signed build runs.
+6. GitHub: tag `v0.1.0` after the hardware test to publish a release (untried). Signing and notarization need the user's Apple Developer ID and the secrets listed in the workflow; hardened-runtime entitlements are a best guess until a signed build runs. Pick a licence.
 
 ## Constraints and preferences
 - Pragmatic and minimal. Single-file daemon; don't add frameworks.
