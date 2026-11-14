@@ -1,0 +1,41 @@
+#!/bin/sh
+# Runs as root after install: create/refresh the CUPS queue, start the proxy for logged-in users.
+LABEL=local.niimbot-proxy
+
+# The pkg carries one app per CPU type; keep the one for this Mac.
+# (NIIMBOT_TEST_ROOT: dry run of just this step against a scratch directory, for tests.)
+T="${NIIMBOT_TEST_ROOT:-}"
+APPS="$T/Library/Application Support/NiimbotProxy/apps"
+if [ "${NIIMBOT_TEST_ARM64:-$(sysctl -n hw.optional.arm64 2>/dev/null)}" = 1 ]; then arch=arm64; else arch=x86_64; fi
+[ -d "$APPS/$arch/NiimbotProxy.app" ] || arch=$(ls "$APPS" 2>/dev/null | head -1)
+if [ -n "$arch" ] && [ -d "$APPS/$arch/NiimbotProxy.app" ]; then
+  rm -rf "$T/Applications/NiimbotProxy.app"
+  mv "$APPS/$arch/NiimbotProxy.app" "$T/Applications/NiimbotProxy.app"
+else
+  echo "niimbot: no app build found in the package" >&2
+  exit 1
+fi
+rm -rf "$T/Library/Application Support/NiimbotProxy"
+[ -z "$T" ] || exit 0
+PLIST=/Library/LaunchAgents/$LABEL.plist
+DIR=/Library/Printers/NiimbotB1
+QUEUE=Niimbot_B1
+
+# Upgrading replaces the queue's PPD, which would reset the user's saved defaults: carry them over.
+KEEP=""
+if [ -r "/etc/cups/ppd/$QUEUE.ppd" ]; then
+  KEEP=$(sed -n -E 's/^\*Default(PageSize|Density|LabelType|Dither|BlackLevel): *([A-Za-z0-9.]+).*/-o \1=\2/p' \
+         "/etc/cups/ppd/$QUEUE.ppd" | tr '\n' ' ')
+fi
+
+/usr/sbin/lpadmin -p "$QUEUE" -E -v "socket://127.0.0.1:9109" -P "$DIR/NiimbotB1.ppd" \
+  -D "Niimbot B1" -L "USB / Bluetooth via Niimbot Proxy" -o printer-is-shared=false \
+  || echo "niimbot: lpadmin failed" >&2
+# Unquoted on purpose: one "-o Name=Value" pair per word. A value the new PPD lacks is just rejected.
+[ -z "$KEEP" ] || /usr/sbin/lpadmin -p "$QUEUE" $KEEP 2>/dev/null || true
+
+# Other users get the agent at their next login (it lives in /Library/LaunchAgents).
+for uid in $(ps -axo uid=,comm= | awk '$2 ~ /loginwindow$/ {print $1}' | sort -u); do
+  launchctl bootstrap "gui/$uid" "$PLIST" 2>/dev/null || true
+done
+exit 0

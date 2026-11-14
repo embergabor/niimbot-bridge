@@ -1,0 +1,97 @@
+# Builds NiimbotProxy.app on Apple Silicon and Intel, then one installer that carries both.
+# Push a tag like v0.1.0 to also publish the installer as a GitHub Release.
+#
+# Unsigned by default. To sign and notarize, add these repository secrets:
+#   MACOS_CERT_P12, MACOS_CERT_PASSWORD   base64 .p12 with both Developer ID certificates, and its password
+#   CODESIGN_ID                           "Developer ID Application: Name (TEAMID)"
+#   INSTALLER_ID                          "Developer ID Installer: Name (TEAMID)"
+#   NOTARY_KEY_P8, NOTARY_KEY_ID, NOTARY_ISSUER   App Store Connect API key (base64 .p8), its id and issuer id
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  app:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-15, arch: arm64 }
+          - { os: macos-15-intel, arch: x86_64 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.15"
+      - name: Signing certificate
+        env:
+          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: ./packaging/ci_keychain.sh
+      - name: Test, build and smoke-test the app
+        env:
+          APP_ONLY: "1"
+          CODESIGN_ID: ${{ secrets.CODESIGN_ID }}
+        run: |
+          test "$(uname -m)" = "${{ matrix.arch }}"
+          ./packaging/build.sh
+      - name: Pack (tar keeps symlinks and permissions)
+        run: tar -C build/dist -czf NiimbotProxy-${{ matrix.arch }}.app.tar.gz NiimbotProxy.app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-${{ matrix.arch }}
+          path: NiimbotProxy-${{ matrix.arch }}.app.tar.gz
+          retention-days: 7
+
+  pkg:
+    needs: app
+    runs-on: macos-15
+    permissions:
+      contents: write          # only used to publish a release on a tag
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+      - name: Unpack both builds
+        run: |
+          for a in arm64 x86_64; do
+            mkdir -p apps/$a && tar -C apps/$a -xzf NiimbotProxy-$a.app.tar.gz
+          done
+      - name: Signing certificate
+        env:
+          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: ./packaging/ci_keychain.sh
+      - name: Build the installer
+        env:
+          INSTALLER_ID: ${{ secrets.INSTALLER_ID }}
+          NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER: ${{ secrets.NOTARY_ISSUER }}
+        run: |
+          if [ -n "$NOTARY_KEY_P8" ]; then
+            echo "$NOTARY_KEY_P8" | base64 --decode > "$RUNNER_TEMP/notary.p8"
+            export NOTARY_KEY="$RUNNER_TEMP/notary.p8"
+          fi
+          VERSION=$(sed -n -E 's/^__version__ = "([^"]+)"/\1/p' niimbot_proxy.py)
+          ./packaging/make_pkg.sh "dist/NiimbotBridge-$VERSION.pkg" \
+            apps/arm64/NiimbotProxy.app apps/x86_64/NiimbotProxy.app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer
+          path: dist/*.pkg
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/*.pkg --title "Niimbot Bridge $GITHUB_REF_NAME" --generate-notes

@@ -1,0 +1,35 @@
+#!/bin/bash
+# CUPS filter for niimbot-proxy. (bash, not sh: needs `read -t`. /bin/bash ships with every macOS.)
+# argv: job-id user title copies options [file]
+# 1. Emits one header line with job options, then passes the PDF through unchanged.
+#    Queue defaults (set in printer settings / lpadmin -o) are read from the PPD;
+#    explicit job options come later on the line and win.
+# 2. Then relays what the proxy reports back (CUPS back-channel, fd 3) to the print queue:
+#    progress, printer state such as "cover open", and whether the job really printed.
+
+defaults=""
+if [ -n "$PPD" ] && [ -r "$PPD" ]; then
+  defaults=$(sed -n -E 's/^\*Default(Density|LabelType|Dither|BlackLevel): *([A-Za-z0-9]+).*/\1=\2/p' "$PPD" | tr '\r\n' '  ')
+fi
+
+echo "INFO: niimbot-filter copies=$4 $defaults $5" >&2
+printf 'NIIMBOT/1 copies=%s %s %s\n' "${4:-1}" "$defaults" "$5"
+
+if [ -n "$6" ]; then
+  cat "$6" || exit 1
+else
+  cat || exit 1
+fi
+exec 1>&-                                   # end of job data: the backend half-closes the socket
+
+{ : <&3; } 2>/dev/null || exit 0            # no back-channel (run by hand): nothing to wait for
+
+# The proxy repeats its last status every 10 s, so 45 s of silence means it is gone.
+while IFS= read -r -t 45 line <&3; do
+  case "$line" in
+    "NIIMBOT-DONE ok"*)   exit 0 ;;
+    "NIIMBOT-DONE fail"*) exit 1 ;;
+    INFO:*|WARNING:*|ERROR:*|STATE:*) echo "$line" >&2 ;;
+  esac
+done
+exit 0
