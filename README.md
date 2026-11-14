@@ -31,7 +31,7 @@ The package isn't signed with an Apple Developer ID. On a Mac that downloaded it
 - **Print dialog:** pick **Niimbot B1**. Set Paper Size to the label size: 18 common B1 sizes from 20×10 to 50×80 mm, 50×30 by default, and custom sizes work too. Under Printer Features you can set:
   - *Print Density* (1–5): how dark the dots are
   - *Paper Type*: *Automatic* (the default) reads it from the RFID tag on a genuine Niimbot roll and falls back to gaps; or choose gaps, black mark, continuous or transparent yourself
-  - *Halftoning*: threshold for text and barcodes, dither for photos
+  - *Halftoning*: threshold for text and barcodes, dither for photos. Dither is rough on the B1: mid-greys print light and streaky, so expect a recognisable picture, not a good one
   - *Black Level* (threshold mode): which shades turn black. *Normal* prints only darker than mid-grey. *Dark* also prints mid-tones. *Darkest* also prints pale colours such as yellow and light grey. *Light* prints only strong darks.
 - **Presets per label roll:** in the print dialog, choose Presets → *Save Current Settings as Preset…* (for example "40×30 barcodes").
 - **CLI:** `lp -d Niimbot_B1 -o media=Custom.40x30mm -o Density=4 -o BlackLevel=Dark label.pdf`
