@@ -29,6 +29,7 @@ exec 1>&-                                   # end of job data: the backend half-
 # (the proxy repeats its last status every 10 s, so that much silence means it is gone).
 buf="" idle=0
 while [ "$idle" -lt 225 ]; do
+  line=""                                   # a read that fails with nothing waiting leaves $line untouched
   if IFS= read -r line <&3 2>/dev/null; then
     line="$buf$line" buf="" idle=0
     case "$line" in
