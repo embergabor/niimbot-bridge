@@ -412,6 +412,16 @@ def test_print_queue_hears_failure():
     assert code == 0 and "ERROR:" in err, (code, err)  # opt-out: job counts as done, message still shown
 
 
+def test_top_offset_moves_the_image_and_keeps_the_length():
+    rows = [bytes([i]) * 48 for i in range(1, 21)]
+    down = np.shift_rows(rows, 0.5)                    # 0.5 mm = 4 rows at 203 dpi
+    assert len(down) == 20 and down[:4] == [bytes(48)] * 4 and down[4:] == rows[:16]
+    up = np.shift_rows(rows, -0.5)
+    assert len(up) == 20 and up[:16] == rows[4:] and up[16:] == [bytes(48)] * 4
+    assert np.shift_rows(rows, 0) == rows and np.shift_rows(rows, "junk") == rows
+    assert np.shift_rows(rows, 99) == [bytes(48)] * 20
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

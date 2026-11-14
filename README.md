@@ -53,6 +53,7 @@ Optional, per user: `~/Library/Application Support/NiimbotProxy/config.json`
 - `transport`: `auto` | `usb` | `ble`
 - `address`: a `/dev/cu.usbmodem…` path, or the BLE identifier from `scan` (on macOS this is a UUID, not a MAC address)
 - `wait`: seconds to wait for a printer that is off or unplugged before a job fails (default 60)
+- `top_offset_mm`: moves the print down the label by this many millimetres, or up if negative (default 0). The B1 can't print the first ~0.4 mm at a label's top edge, so keep content a millimetre away from the edges
 - `report_failures`: `true` (default) keeps failed jobs in the print queue; `false` marks them done
 
 After editing it: `launchctl kickstart -k gui/$(id -u)/local.niimbot-proxy`

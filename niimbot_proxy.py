@@ -283,6 +283,24 @@ def document_to_pages(data: bytes, dither: bool = False, threshold: int = 128) -
     return [image_to_rows(Image.open(io.BytesIO(data)), dither, threshold)]
 
 
+# Config "top_offset_mm" nudges the print down the label (up if negative). On a 50x30 roll the B1 loses
+# about the first 0.4 mm at the top edge, but shifting by 0.5 mm overshoots, so the default stays 0.
+TOP_OFFSET_MM = 0.0
+
+
+def shift_rows(rows: list[bytes], mm) -> list[bytes]:
+    """Move the image down the label by mm (up if negative), keeping the page length."""
+    try:
+        n = round(float(mm) * DPI / 25.4)
+    except (TypeError, ValueError):
+        n = 0
+    n = max(-len(rows), min(len(rows), n))
+    blank = [bytes(HEAD_PX // 8)] * abs(n)
+    if n > 0:
+        return blank + rows[:len(rows) - n]
+    return rows[-n:] + blank if n < 0 else rows
+
+
 def black_level(value: str | int | None) -> int:
     """'Darkest' / 'normal' / '200' → threshold 1..255."""
     v = str(value if value is not None else "normal").strip().lower()
@@ -561,6 +579,7 @@ class Proxy:
         pages = await asyncio.to_thread(document_to_pages, data, opts["dither"], threshold)
         if not pages:
             raise PrinterError("document has no pages")
+        pages = [shift_rows(rows, self.cfg.get("top_offset_mm", TOP_OFFSET_MM)) for rows in pages]
         log.info("job: %d page(s) × %d, density=%d, label_type=%s, dither=%s, threshold=%d",
                  len(pages), opts["copies"], opts["density"], opts["label_type"] or "auto", opts["dither"], threshold)
         async with self.lock:
