@@ -1,104 +1,72 @@
-# niimbot-proxy
+# Niimbot Bridge
 
-Lets a Niimbot B1 show up as a normal printer on macOS. Any app can print to it (Preview, Pages, a browser, `lp`), over USB or Bluetooth.
+Use a Niimbot B1 label printer as a normal printer on macOS, over USB or Bluetooth. After installing, **Niimbot B1** appears in the print dialog of every app.
 
-```
-App → print dialog → CUPS queue "Niimbot_B1" → niimbot-filter (passes options through)
-    → socket://127.0.0.1:9109 → NiimbotProxy.app → render PDF at 203 dpi, 1-bit
-    → B1 protocol → USB (CDC serial, VID 0x3513) or Bluetooth LE
-```
-
-One code path handles both transports. Only the byte pipe differs: pyserial for USB, bleak for BLE.
-In `auto` mode the proxy uses USB when the printer is plugged in, and Bluetooth otherwise.
+Needs macOS 15 or later. Works on Apple Silicon and Intel Macs.
 
 ## Install
 
-Double-click `NiimbotBridge-<version>-<arch>.pkg` and enter your admin password. Nothing else needs installing: Python and every library are bundled inside the app.
+1. Download `NiimbotBridge-<version>.pkg` from the [latest release](https://github.com/embergabor/niimbot-bridge/releases/latest).
+2. Double-click the file. macOS will refuse to open it, because the installer isn't signed by Apple.
+3. Open **System Settings → Privacy & Security**, scroll down to the message about NiimbotBridge, and click **Open Anyway**.
+4. Follow the installer and enter your Mac password when asked.
+5. Switch the printer on. For USB, plug it in. For Bluetooth, leave the cable unplugged and make sure the Niimbot phone app isn't connected to the printer.
 
-It installs:
+That's all. There is nothing else to install and nothing to configure. The printer does not need to be paired in Bluetooth settings.
 
-| Path | What |
+The first time you print over Bluetooth, macOS may ask whether *NiimbotProxy* may use Bluetooth. Click **Allow**.
+
+## Print a label
+
+1. In any app, choose **File → Print** and pick **Niimbot B1** as the printer.
+2. Set **Paper Size** to the size of your labels, for example 50 × 30 mm. If your size isn't listed, choose *Manage Custom Sizes…*.
+3. Click **Print**.
+
+Tips:
+
+- Make the page in your document the same size as the label.
+- Keep text and graphics about 1 mm away from the edges.
+- If the printer is plugged in, it prints over USB. Otherwise it uses Bluetooth.
+- To avoid picking the size every time, choose **Presets → Save Current Settings as Preset…** in the print dialog.
+
+## Options
+
+In the print dialog, under **Printer Features** (you may need to click *Show Details*):
+
+| Option | What it does |
 |---|---|
-| `/Applications/NiimbotProxy.app` | The proxy (background-only app, no Dock icon) |
-| `/Library/Printers/NiimbotB1/` | CUPS filter and PPD |
-| `/Library/LaunchAgents/local.niimbot-proxy.plist` | Starts the proxy at login and keeps it running |
-| CUPS queue **Niimbot B1** | Created by the installer |
+| **Print Density** | How dark the print is, 1 to 5. The default is 3. |
+| **Paper Type** | *Automatic* reads the type from genuine Niimbot rolls. For other rolls, choose it yourself: with gaps, black mark, continuous or transparent. |
+| **Black Level** | Which colours print as black. *Normal* prints only dark colours. *Dark* adds mid-tones. *Darkest* also prints pale colours such as yellow. *Light* prints only the strongest darks. |
+| **Halftoning** | *Threshold* is right for text, barcodes and logos. *Dither* is for photos, but photos come out rough on this printer. |
 
-The package isn't signed with an Apple Developer ID. On a Mac that downloaded it, Gatekeeper blocks the first open: right-click → **Open**, or allow it under System Settings → Privacy & Security.
+## If something goes wrong
 
-## Use
-
-- **Print dialog:** pick **Niimbot B1**. Set Paper Size to the label size: 18 common B1 sizes from 20×10 to 50×80 mm, 50×30 by default, and custom sizes work too. Under Printer Features you can set:
-  - *Print Density* (1–5): how dark the dots are
-  - *Paper Type*: *Automatic* (the default) reads it from the RFID tag on a genuine Niimbot roll and falls back to gaps; or choose gaps, black mark, continuous or transparent yourself
-  - *Halftoning*: threshold for text and barcodes, dither for photos. Dither is rough on the B1: mid-greys print light and streaky, so expect a recognisable picture, not a good one
-  - *Black Level* (threshold mode): which shades turn black. *Normal* prints only darker than mid-grey. *Dark* also prints mid-tones. *Darkest* also prints pale colours such as yellow and light grey. *Light* prints only strong darks.
-- **Presets per label roll:** in the print dialog, choose Presets → *Save Current Settings as Preset…* (for example "40×30 barcodes").
-- **CLI:** `lp -d Niimbot_B1 -o media=Custom.40x30mm -o Density=4 -o BlackLevel=Dark label.pdf`
-- **The app's own CLI** (`P=/Applications/NiimbotProxy.app/Contents/MacOS/NiimbotProxy`):
-  - `$P print label.png --transport usb` prints directly, without CUPS
-  - `$P render label.pdf preview.png [--black-level darkest]` writes exactly what would be printed, as a PNG
-  - `$P scan` lists USB ports and BLE devices
-  - `$P status` shows what the printer reports about the loaded roll (labels left, paper type)
-  - `$P version` shows the bundled library versions
-
-Make the page the size of the label (width = across the printhead, max 50 mm). Pages wider than 48 mm are scaled to fit the 384 px head. A landscape page that only fits when rotated is rotated automatically.
-
-## Config
-
-Optional, per user: `~/Library/Application Support/NiimbotProxy/config.json`
-```json
-{ "transport": "auto", "ble_name": "B1", "address": null }
-```
-- `transport`: `auto` | `usb` | `ble`
-- `address`: a `/dev/cu.usbmodem…` path, or the BLE identifier from `scan` (on macOS this is a UUID, not a MAC address)
-- `wait`: seconds to wait for a printer that is off or unplugged before a job fails (default 60)
-- `top_offset_mm`: moves the print down the label by this many millimetres, or up if negative (default 0). The B1 can't print the first ~0.4 mm at a label's top edge, so keep content a millimetre away from the edges
-- `report_failures`: `true` (default) keeps failed jobs in the print queue; `false` marks them done
-
-Changes apply from the next print job; no restart is needed. (To restart the proxy anyway: `pkill -x NiimbotProxy`; it comes back within ten seconds.)
-
-## Logs and troubleshooting
-
-- `tail -f ~/Library/Logs/NiimbotProxy.log`
-- If the printer is off or unplugged, the job waits up to a minute for it (you get a notification), then fails.
-- The print queue shows progress ("Printed label 2 of 4") and, with a tagged roll, how many labels are left.
-- If a print fails, the job stays in the print queue with the reason, so you can fix the problem and resume it. You also get a notification. Cover-open, out-of-paper and offline show as printer status.
-  If a failed job ever blocks the queue in a way you don't want, set `"report_failures": false` in the config: failed jobs then count as done, as before.
-- PNG and JPEG files print directly with `print`; transparent areas print as blank paper.
-- The CUPS job stays "printing" until the label has physically come out.
-- **Bluetooth:** the first BLE print triggers a Bluetooth permission prompt for *NiimbotProxy*. Allow it. If the phone app is connected to the printer, disconnect it first.
-- **Blank or shifted output:** try the other Paper Type, or a higher density.
+- **The job waits and nothing prints.** The printer is off, asleep or out of range. Switch it on or plug it in; the job waits up to a minute for it.
+- **The job failed.** It stays in the print queue with the reason, such as an open cover or an empty roll. Fix the problem, then open the print queue and retry the job.
+- **Nothing prints over Bluetooth.** Disconnect the Niimbot phone app from the printer, and check that NiimbotProxy is allowed under **System Settings → Privacy & Security → Bluetooth**.
+- **The print is blank or shifted.** Choose the correct Paper Type by hand, or raise the Print Density.
+- **You need more detail.** The log is at `~/Library/Logs/NiimbotProxy.log`.
 
 ## Uninstall
+
+Open Terminal and run:
 
 ```bash
 sudo /Applications/NiimbotProxy.app/Contents/Resources/uninstall.sh
 ```
-This leaves your config and log in `~/Library`.
 
-## Build
+## Credits
 
-```bash
-./packaging/build.sh                         # → dist/NiimbotBridge-<version>-<arch>.pkg
-PYTHON=/path/to/python3 ./packaging/build.sh # build with a specific Python
-```
-That builds for the Mac you run it on. **One installer for both Apple Silicon and Intel** comes from GitHub Actions (`.github/workflows/build.yml`): it builds the app on each kind of Mac, then `packaging/make_pkg.sh` puts both into one pkg, and the installer keeps the build that matches the Mac. Pushing a tag like `v0.1.0` publishes the pkg as a release.
+The printer protocol comes from the work of these projects:
 
-**Signing and notarization** are off until you add an Apple Developer ID. The workflow file lists the repository secrets it needs; locally, set `CODESIGN_ID`, `INSTALLER_ID` and the `NOTARY_*` variables described at the top of `build.sh` and `make_pkg.sh`.
+- [niimbluelib](https://github.com/MultiMote/niimbluelib) by MultiMote, and its documentation at [printers.niim.blue](https://printers.niim.blue)
+- [niimprint](https://github.com/AndBondStyle/niimprint) by AndBondStyle
 
-The build creates its own venv under `build/`, runs the tests, freezes the app with PyInstaller, smoke-tests the frozen app, and wraps it with `pkgbuild` and `productbuild`.
-Library versions are pinned in `packaging/constraints.txt`; change them there on purpose, then rebuild.
-The app targets the build machine's CPU, and the minimum macOS of the Python you build with. Homebrew Python only covers the current macOS. python.org Python goes back to 11.0+.
+The app bundles these libraries: [bleak](https://github.com/hbldh/bleak) (Bluetooth), [pyserial](https://github.com/pyserial/pyserial) (USB), [pypdfium2](https://github.com/pypdfium2-team/pypdfium2) with PDFium (PDF rendering), [Pillow](https://github.com/python-pillow/Pillow) (images) and [PyObjC](https://github.com/ronaldoussoren/pyobjc). It is packaged with [PyInstaller](https://github.com/pyinstaller/pyinstaller).
 
-For development, run from source with the build venv: `build/venv/bin/python niimbot_proxy.py -v print …`.
-
-## Notes
-
-- Protocol: the "B1" print task from niimbluelib (MultiMote), documented at printers.niim.blue. It is also compatible with niimprint (AndBondStyle).
-- Single colour only. B1 Pro red/black printing is not implemented.
-- `tests/test_proxy.py` runs the whole path against a simulated printer: filter → socket → daemon → packets → decoded image.
+Niimbot is a trademark of its owner. This project is not affiliated with Niimbot.
 
 ## Licence
 
-MIT, see `LICENSE`.
+MIT, see [LICENSE](LICENSE).

@@ -95,6 +95,7 @@ Response ids are in the `RESPONSE` dict. 0xDB means a printer error.
 6. GitHub: for the next release bump `__version__` in `niimbot_proxy.py`, then push a matching `v*` tag. Signing and notarization need the user's Apple Developer ID and the secrets listed in the workflow; hardened-runtime entitlements are a best guess until a signed build runs.
 
 ## Constraints and preferences
+- `README.md` is a user guide only (install steps, how to print, options, troubleshooting, uninstall, credits), by the user's request. Technical, build, config-file (`transport`, `address`, `ble_name`, `wait`, `report_failures`, `top_offset_mm` in `~/Library/Application Support/NiimbotProxy/config.json`) and CLI details belong here, not there.
 - Pragmatic and minimal. Single-file daemon; don't add frameworks.
 - The end user needs no Python, no Homebrew and no terminal. Everything ships inside the pkg.
 - Python ≥ 3.9 (the CLT python): use `from __future__ import annotations`, no `match`.
