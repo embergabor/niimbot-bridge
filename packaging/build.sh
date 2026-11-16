@@ -35,8 +35,9 @@ echo "==> Tests"
 "$V/bin/python" "$HERE/tests/test_proxy.py"
 
 echo "==> App"
+"$V/bin/python" "$HERE/packaging/make_icon.py" "$B/icon" >/dev/null
 SIGN="${CODESIGN_ID:--}"                                           # "-" = ad-hoc
-NIIMBOT_VERSION="$VERSION" NIIMBOT_MIN_MACOS="$MIN_MACOS" NIIMBOT_CODESIGN_ID="${CODESIGN_ID:-}" \
+NIIMBOT_ICON="$B/icon/NiimbotProxy.icns" NIIMBOT_VERSION="$VERSION" NIIMBOT_MIN_MACOS="$MIN_MACOS" NIIMBOT_CODESIGN_ID="${CODESIGN_ID:-}" \
   "$V/bin/pyinstaller" --noconfirm --clean --log-level WARN \
   --distpath "$B/dist" --workpath "$B/work" "$HERE/packaging/NiimbotProxy.spec"
 APP="$B/dist/NiimbotProxy.app"

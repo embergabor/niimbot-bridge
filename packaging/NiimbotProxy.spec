@@ -35,6 +35,7 @@ app = BUNDLE(
     coll,
     name="NiimbotProxy.app",
     bundle_identifier=BUNDLE_ID,
+    icon=os.environ.get("NIIMBOT_ICON") or None,      # drawn by packaging/make_icon.py
     version=VERSION,
     info_plist={
         "CFBundleName": "NiimbotProxy",

@@ -12,6 +12,7 @@ BLACK_LEVELS = [("Light", "Light (only strong darks)"), ("Normal", "Normal"),
                 ("Dark", "Dark (mid-tones print)"), ("Darkest", "Darkest (pale colours print)")]
 DEFAULT = (50, 30)
 FILTER = "/Library/Printers/NiimbotB1/niimbot-filter"
+ICON = "/Library/Printers/NiimbotB1/NiimbotB1.icns"       # printer icon in the print dialog and Settings
 
 
 def name(w: int, h: int) -> str:
@@ -36,6 +37,7 @@ def main():
                  '*DefaultColorSpace: Gray', '*FileSystem: False', '*Throughput: "1"',
                  '*LandscapeOrientation: Plus90', '*TTRasterizer: Type42', '*cupsVersion: 2.3',
                  '*cupsManualCopies: False',
+                 f'*APPrinterIconPath: "{ICON}"',
                  f'*cupsFilter2: "application/vnd.cups-pdf application/vnd.niimbot-job 0 {FILTER}"'):
         a(line)
 

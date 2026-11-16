@@ -36,6 +36,8 @@ done
 
 python3 "$HERE/cups/make_ppd.py" "$R/Library/Printers/NiimbotB1/NiimbotB1.ppd" >/dev/null
 chmod 644 "$R/Library/Printers/NiimbotB1/NiimbotB1.ppd"
+# The printer uses the app's icon (both builds carry the same one).
+install -m 644 "$1/Contents/Resources/NiimbotProxy.icns" "$R/Library/Printers/NiimbotB1/NiimbotB1.icns"
 install -m 755 "$HERE/cups/niimbot-filter"  "$R/Library/Printers/NiimbotB1/niimbot-filter"
 install -m 644 "$HERE/packaging/$ID.plist"  "$R/Library/LaunchAgents/$ID.plist"
 chmod 755 "$HERE/packaging/scripts/"*

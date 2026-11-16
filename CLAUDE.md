@@ -39,6 +39,7 @@ App → print dialog → CUPS queue "Niimbot_B1"
 | `packaging/build.sh` | Build venv `build/venv` → tests → PyInstaller → smoke test → calls `make_pkg.sh`. `APP_ONLY=1` stops after the app. `CODESIGN_ID` signs with hardened runtime. |
 | `packaging/make_pkg.sh` | One or more per-arch apps → one pkg. Payload stages them under `/Library/Application Support/NiimbotProxy/apps/<arch>/`; `postinstall` moves the matching one to `/Applications` and deletes the staging. Optional `INSTALLER_ID`, `NOTARY_*`. |
 | `.github/workflows/build.yml`, `packaging/ci_keychain.sh`, `entitlements.plist` | CI: arm64 + Intel app builds, combined pkg, release on `v*` tags; signing only when secrets exist |
+| `packaging/make_icon.py` | Draws the icon (original artwork of a small slate label printer with a barcode label; no Niimbot logo) with Pillow and builds `NiimbotProxy.icns` with `iconutil`. `build.sh` runs it; the app bundle uses it, and `make_pkg.sh` copies it to `/Library/Printers/NiimbotB1/NiimbotB1.icns`, which the PPD's `*APPrinterIconPath` names. `cupstestppd` fails on that path until the pkg is installed. |
 | `packaging/NiimbotProxy.spec`, `local.niimbot-proxy.plist`, `scripts/{pre,post}install`, `uninstall.sh` | App spec, LaunchAgent, pkg scripts, uninstaller |
 | `tests/test_proxy.py` | Offline end-to-end test against a simulated B1 (`build/venv/bin/python tests/test_proxy.py`) |
 
