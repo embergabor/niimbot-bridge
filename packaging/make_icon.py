@@ -1,4 +1,4 @@
-"""Draws the app and printer icon (a small label printer with a label coming out) and writes an .icns.
+"""Draws the app and printer icon (a flat small label printer with a label coming out) and writes an .icns.
     python packaging/make_icon.py OUT_DIR        → OUT_DIR/NiimbotProxy.icns and OUT_DIR/NiimbotProxy.png
 Needs Pillow and macOS's iconutil. Original artwork; no Niimbot logo."""
 from __future__ import annotations
@@ -8,7 +8,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageDraw
 
 S = 4                      # draw at 4x and scale down, for smooth edges
 N = 1024 * S
@@ -43,23 +43,12 @@ def paint(img, box, r, top, bottom=None):
 
 
 def draw() -> Image.Image:
-    img = Image.new("RGBA", (N, N), (0, 0, 0, 0))
-
-    # soft shadow under the printer
-    sh = Image.new("L", (N, N), 0)
-    ImageDraw.Draw(sh).rounded_rectangle(px(150, 470, 874, 930), radius=130 * S, fill=110)
-    sh = sh.filter(ImageFilter.GaussianBlur(28 * S))
-    img.paste((0, 0, 0, 255), (0, 0), sh)
-
+    """Flat style: solid colours, no shadow, gradient or glow."""
     base = Image.new("RGB", (N, N))
     mask = Image.new("L", (N, N), 0)
 
-    # black top cover, behind the paper
-    paint(base, (196, 300, 828, 520), 90, (52, 56, 62), (24, 26, 30))
-    mask.paste(255, (0, 0), rounded((196, 300, 828, 520), 90))
-
     # label backing coming out of the slot, with one white label and a barcode on it
-    paint(base, (290, 96, 734, 470), 18, (236, 238, 240), (214, 217, 220))
+    paint(base, (290, 96, 734, 470), 18, (222, 226, 230))
     mask.paste(255, (0, 0), rounded((290, 96, 734, 470), 18))
     paint(base, (314, 124, 710, 400), 30, (255, 255, 255))
     d = ImageDraw.Draw(base)
@@ -70,34 +59,25 @@ def draw() -> Image.Image:
             d.rectangle(px(x, 162, x + w, 290), fill=ink)
         x += w + 2
     d.rounded_rectangle(px(352, 318, 600, 338), radius=10 * S, fill=ink)
-    d.rounded_rectangle(px(352, 354, 520, 370), radius=8 * S, fill=(120, 126, 134))
+    d.rounded_rectangle(px(352, 354, 520, 370), radius=8 * S, fill=(150, 156, 164))
 
-    # slate front body, overlapping the bottom of the paper
-    paint(base, (150, 440, 874, 900), 120, (86, 102, 116), (50, 60, 70))
+    # slate body, overlapping the bottom of the paper
+    paint(base, (150, 440, 874, 900), 120, (66, 80, 92))
     mask.paste(255, (0, 0), rounded((150, 440, 874, 900), 120))
     d = ImageDraw.Draw(base)
-    d.rounded_rectangle(px(270, 444, 754, 462), radius=9 * S, fill=(20, 22, 26))        # paper slot
-    d.rounded_rectangle(px(190, 474, 834, 482), radius=4 * S, fill=(104, 120, 134))     # top-edge highlight
+    d.rounded_rectangle(px(270, 444, 754, 462), radius=9 * S, fill=(28, 32, 38))        # paper slot
 
-    # blue status light, with a glow
-    glow = Image.new("L", (N, N), 0)
-    ImageDraw.Draw(glow).rounded_rectangle(px(262, 652, 392, 690), radius=19 * S, fill=200)
-    glow = glow.filter(ImageFilter.GaussianBlur(16 * S))
-    base.paste((70, 130, 255), (0, 0), glow)
-    d = ImageDraw.Draw(base)
-    d.rounded_rectangle(px(272, 660, 382, 682), radius=11 * S, fill=(90, 150, 255))
+    d.rounded_rectangle(px(272, 660, 382, 682), radius=11 * S, fill=(90, 150, 255))     # blue status light
 
     # round power button
     cx, cy, r = 690, 690, 70
-    d.ellipse(px(cx - r - 8, cy - r - 8, cx + r + 8, cy + r + 8), fill=(38, 46, 54))
-    d.ellipse(px(cx - r, cy - r, cx + r, cy + r), fill=(64, 78, 90))
-    sym = (160, 196, 214)
+    d.ellipse(px(cx - r, cy - r, cx + r, cy + r), fill=(84, 100, 114))
+    sym = (176, 206, 222)
     d.arc(px(cx - 34, cy - 30, cx + 34, cy + 38), start=-50, end=230, fill=sym, width=10 * S)
     d.rounded_rectangle(px(cx - 5, cy - 46, cx + 5, cy + 2), radius=5 * S, fill=sym)
 
-    body = base.convert("RGBA")
-    body.putalpha(mask)
-    img.alpha_composite(body)
+    img = base.convert("RGBA")
+    img.putalpha(mask)
     return img.resize((1024, 1024), Image.LANCZOS)
 
 
