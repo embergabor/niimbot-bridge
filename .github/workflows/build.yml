@@ -28,8 +28,8 @@ jobs:
           - { os: macos-15-intel, arch: x86_64 }
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.15"
       - name: Signing certificate
@@ -46,7 +46,7 @@ jobs:
           ./packaging/build.sh
       - name: Pack (tar keeps symlinks and permissions)
         run: tar -C build/dist -czf NiimbotProxy-${{ matrix.arch }}.app.tar.gz NiimbotProxy.app
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: app-${{ matrix.arch }}
           path: NiimbotProxy-${{ matrix.arch }}.app.tar.gz
@@ -58,8 +58,8 @@ jobs:
     permissions:
       contents: write          # only used to publish a release on a tag
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           merge-multiple: true
       - name: Unpack both builds
@@ -86,7 +86,7 @@ jobs:
           VERSION=$(sed -n -E 's/^__version__ = "([^"]+)"/\1/p' niimbot_proxy.py)
           ./packaging/make_pkg.sh "dist/NiimbotBridge-$VERSION.pkg" \
             apps/arm64/NiimbotProxy.app apps/x86_64/NiimbotProxy.app
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: installer
           path: dist/*.pkg
