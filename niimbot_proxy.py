@@ -503,12 +503,26 @@ class B1Printer:
             except Exception as e:
                 log.debug("abort 0x%02x: %s", cmd, e)
 
+    async def _accepted(self, cmd: int, what: str, timeout: float = 30):
+        """Resend while the printer answers 0: it does so while its buffer still holds earlier labels."""
+        loop = asyncio.get_running_loop()
+        end = loop.time() + timeout
+        while True:
+            r = await self.request(cmd, b"\x01")
+            if r and r[0]:
+                return
+            if loop.time() >= end:
+                raise PrinterError(f"{what} rejected")
+            await asyncio.sleep(0.1)
+
     async def _print_started(self, pages: list[list[bytes]], copies: int, total: int):
-        done = 0
+        """Every page (and copy) goes out back to back in one job, as niimbluelib does, so the printer feeds
+        labels without stopping; the printed count is only awaited at the end."""
+        sent = 0
         for rows in pages:
             packets = list(encode_rows(rows))
             for _ in range(copies):
-                await self._ok(Cmd.PAGE_START, b"\x01", "page start")
+                await self._accepted(Cmd.PAGE_START, "page start")
                 await self._ok(Cmd.SET_PAGE_SIZE, struct.pack(">HHH", len(rows), HEAD_PX, 1), "page size")
                 for i, pkt in enumerate(packets):
                     await self.t.write(pkt)
@@ -516,24 +530,24 @@ class B1Printer:
                         await asyncio.sleep(self.t.pace)
                     if i % 16 == 15:
                         self._drain()                      # surface a lid-open / out-of-paper error now
-                for _attempt in range(50):                 # printer may still be busy
-                    r = await self.request(Cmd.PAGE_END, b"\x01")
-                    if r and r[0]:
-                        break
-                    await asyncio.sleep(0.1)
-                else:
-                    raise PrinterError("page end rejected")
-                done += 1
-                await self._wait_printed(done)
-                log.info("page %d/%d printed", done, total)
-                self.say(f"INFO: Printed label {done} of {total}")
+                await self._accepted(Cmd.PAGE_END, "page end")
+                sent += 1
+                log.info("page %d/%d sent", sent, total)
+        await self._wait_printed(total)
 
-    async def _wait_printed(self, page: int, timeout: float = 30):
+    async def _wait_printed(self, total: int, idle: float = 30):
+        """Poll PrintStatus until all pages are out; give up after `idle` seconds without progress."""
         loop = asyncio.get_running_loop()
-        end = loop.time() + timeout
+        last, end = -1, loop.time() + idle
         while loop.time() < end:
             r = await self.request(Cmd.PRINT_STATUS, b"\x01")
-            if len(r) >= 2 and struct.unpack(">H", r[:2])[0] >= page:
+            done = struct.unpack(">H", r[:2])[0] if len(r) >= 2 else 0
+            if done != last:
+                last, end = done, loop.time() + idle
+                if done:
+                    log.info("page %d/%d printed", min(done, total), total)
+                    self.say(f"INFO: Printed label {min(done, total)} of {total}")
+            if done >= total:
                 return
             await asyncio.sleep(0.2)
         raise PrinterError("timed out waiting for page to print")

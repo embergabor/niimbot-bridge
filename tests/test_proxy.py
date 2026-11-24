@@ -27,6 +27,9 @@ class FakeB1:
         self.page_end_zeros = 0          # answer PageEnd with 0 this many times first
         self.rows_seen = 0
         self.rfid = b"\x00"               # RfidInfo reply; default: no tagged roll
+        # The head feeds one buffered page per PrintStatus poll; PageStart answers 0 while the buffer is full.
+        self.capacity = 2
+        self.queued = 0
 
     def reply(self, cmd, data):
         return np.encode_packet(cmd, data)
@@ -54,6 +57,10 @@ class FakeB1:
             self.total = struct.unpack(">H", d[:2])[0]
             return self.reply(R[cmd], b"\x01")
         if cmd == np.Cmd.PAGE_START:
+            if self.queued >= self.capacity:
+                self.queued -= 1                     # the head is busy; it frees a slot meanwhile
+                self.printed += 1
+                return self.reply(R[cmd], b"\x00")
             return self.reply(R[cmd], b"\x01")
         if cmd == np.Cmd.SET_PAGE_SIZE:
             rows, cols, copies = struct.unpack(">HHH", d)
@@ -77,9 +84,12 @@ class FakeB1:
         if cmd == np.Cmd.PAGE_END:
             assert all(r is not None for r in self.cur["data"]), "missing rows"
             self.pages.append(self.cur)
-            self.printed += 1
+            self.queued += 1
             return self.reply(R[cmd], b"\x01")
         if cmd == np.Cmd.PRINT_STATUS:
+            if self.queued:
+                self.queued -= 1
+                self.printed += 1
             return self.reply(R[cmd], struct.pack(">HBB", self.printed, 100, 100))
         if cmd == np.Cmd.PRINT_END:
             return self.reply(R[cmd], b"\x01")
@@ -259,6 +269,19 @@ def test_page_end_retries_while_busy():
     dev.page_end_zeros = 3
     assert run_print(dev, [noisy_rows(4)]) is None
     assert dev.cmds.count(np.Cmd.PAGE_END) == 4 and len(dev.pages) == 1
+
+
+def test_pages_stream_back_to_back():
+    dev = FakeB1()
+    pages = [noisy_rows(4), noisy_rows(6), noisy_rows(5), noisy_rows(3), noisy_rows(4)]
+    assert run_print(dev, pages) is None
+    assert [p["rows"] for p in dev.pages] == [4, 6, 5, 3, 4]
+    # No waiting for a label to print before sending the next: PrintStatus only after the last PageEnd.
+    last_end = len(dev.cmds) - 1 - dev.cmds[::-1].index(np.Cmd.PAGE_END)
+    assert np.Cmd.PRINT_STATUS not in dev.cmds[:last_end], [hex(c) for c in dev.cmds]
+    # The 2-page buffer filled up, so PageStart was retried rather than failing the job.
+    assert dev.cmds.count(np.Cmd.PAGE_START) > 5
+    assert dev.printed == 5 and dev.cmds[-1] == np.Cmd.PRINT_END
 
 
 def test_transparent_png_prints_blank_not_black():

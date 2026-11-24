@@ -52,12 +52,14 @@ Job sequence:
 3. SetLabelType 0x23 `[t]`
 4. PrintStart 0x01 `>H5B (total,0,0,0,0,color)`
 5. Per page:
-   1. PageStart 0x03 `[1]`
+   1. PageStart 0x03 `[1]`, retried while it answers 0 (buffer full)
    2. SetPageSize 0x13 `>HHH (rows, cols=384, 1)`
    3. Rows: 0x85 `>H3BB` (row, c1, c2, c3, repeat) followed by 48 bytes, or 0x84 `>HB` for blank runs
    4. PageEnd 0xE3 `[1]`, retried while it answers 0
-   5. Poll PrintStatus 0xA3 `[1]` until the page index (u16) ≥ pages done
-6. PrintEnd 0xF3 `[1]`
+6. After the last page: poll PrintStatus 0xA3 `[1]` until the printed count (u16) ≥ total (30 s without progress = failure)
+7. PrintEnd 0xF3 `[1]`
+
+Pages (and copies) stream back to back in one job, as in niimbluelib's B1 task; the printer holds back PageStart/PageEnd (answers 0) while its buffer is full. Until 2026-11-24 the proxy waited for each page to print before sending the next, which made the B1 stop between labels. Streaming is tested offline only (`test_pages_stream_back_to_back`, fake 2-page buffer), not yet on hardware.
 
 Response ids are in the `RESPONSE` dict. 0xDB means a printer error.
 
