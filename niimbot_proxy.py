@@ -34,7 +34,7 @@ import sys
 import threading
 from pathlib import Path
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 log = logging.getLogger("niimbot")
 FROZEN = getattr(sys, "frozen", False)          # running inside NiimbotProxy.app (PyInstaller)
 LOG_FILE = Path.home() / "Library/Logs/NiimbotProxy.log"
